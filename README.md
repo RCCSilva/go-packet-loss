@@ -1,6 +1,6 @@
 # Packet Loss
 
-Simple projeto to test impacts of packet loss using TCP and UDP protocols.
+Simple project to test impacts of packet loss and delays using TCP and UDP protocols.
 
 ## Commands
 
