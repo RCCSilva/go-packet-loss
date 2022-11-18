@@ -21,3 +21,15 @@ sudo tc qdisc replace dev lo root netem loss 50%
 ```shell
 sudo tc qdisc del dev lo root netem loss 50%
 ```
+
+- Simulate packet delay
+
+```shell
+sudo tc qdisc replace dev lo root netem delay 2s 1.5s
+```
+
+- Remove packet delay
+
+```shell
+sudo tc qdisc del dev lo root netem delay 2s 1.5s
+```

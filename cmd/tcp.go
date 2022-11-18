@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	"fmt"
+	"encoding/binary"
 	"log"
 	"net"
 	"time"
@@ -16,12 +16,10 @@ func TestTCP() {
 	if !rListenTCP.isOk() {
 		log.Fatalf("failed to start tcp listener: %v", rListenTCP.Error)
 	}
-	log.Print("tcp listener started!")
 	rWriteTCP := WriteTCP(ctx, rListenTCP.Address)
 	if r := <-rWriteTCP; !r.isOk() {
 		log.Fatalf("failed to start tcp writer: %v", r.Error)
 	}
-	log.Printf("tcp writer started!")
 	<-ctx.Done()
 }
 
@@ -38,13 +36,11 @@ func WriteTCP(ctx context.Context, addr string) <-chan Result {
 		defer c.Close()
 		result <- Result{}
 		counter := 1001
+		log.Printf("tcp writer: started")
 
 		for {
+			binary.Write(c, binary.LittleEndian, int16(counter))
 			time.Sleep(1 * time.Second)
-			_, err := c.Write([]byte(fmt.Sprint(counter)))
-			if err != nil {
-				log.Printf("failed to write %v", err)
-			}
 			counter++
 		}
 	}()
@@ -68,24 +64,33 @@ func ListenTCP(ctx context.Context) <-chan Result {
 		result <- Result{
 			Address: listener.Addr().String(),
 		}
+		log.Print("tcp listener: started!")
 
 		for {
 			c, err := listener.Accept()
 
 			if err != nil {
-				log.Printf("error: %v", err)
+				log.Printf("tcp listener: failed to establish connection: %v", err)
 				continue
 			}
 
 			go func() {
 				defer c.Close()
+				var current, last int16
+
+				binary.Read(c, binary.LittleEndian, &current)
+
 				for {
-					b := make([]byte, 16)
-					n, err := c.Read(b)
+					err := binary.Read(c, binary.LittleEndian, &current)
 					if err != nil {
 						continue
 					}
-					log.Printf("tcp: %q", b[:n])
+					if last > 0 && current < last {
+						log.Printf("tcp listener: received %v - OUT OF ORDER!", current)
+					} else {
+						log.Printf("tcp listener: received %v", current)
+					}
+					last = current
 				}
 			}()
 		}

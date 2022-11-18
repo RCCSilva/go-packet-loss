@@ -1,8 +1,9 @@
 package main
 
 import (
+	"bufio"
 	"context"
-	"fmt"
+	"encoding/binary"
 	"log"
 	"net"
 	"time"
@@ -16,12 +17,10 @@ func TestUDP() {
 	if !rListenUDP.isOk() {
 		log.Fatalf("udp: failed to start udp listener: %v", rListenUDP.Error)
 	}
-	log.Print("udp: listener started!")
 	rWriteUDP := WriteUDP(ctx, rListenUDP.Address)
 	if r := <-rWriteUDP; !r.isOk() {
 		log.Fatalf("udp: failed to start writer: %v", r.Error)
 	}
-	log.Printf("udp: writer started!")
 	<-ctx.Done()
 }
 
@@ -35,10 +34,13 @@ func WriteUDP(ctx context.Context, addr string) <-chan Result {
 			return
 		}
 		defer c.Close()
-		log.Print("udp: writer started!")
+		log.Print("udp writer: writer started!")
+		writer := bufio.NewWriter(c)
 		counter := 2001
 		for {
-			c.Write([]byte(fmt.Sprint(counter)))
+			// log.Printf("udp writer: writing %v", counter)
+			binary.Write(writer, binary.LittleEndian, int16(counter))
+			writer.Flush()
 			time.Sleep(1 * time.Second)
 			counter++
 		}
@@ -63,13 +65,18 @@ func ListenUDP(ctx context.Context) <-chan Result {
 			Address: l.LocalAddr().String(),
 		}
 
+		var current, last int16
+		log.Print("udp listener: started!")
+
 		for {
-			b := make([]byte, 16)
-			rlen, _, err := l.ReadFromUDP(b)
-			if err != nil {
-				continue
+			binary.Read(l, binary.LittleEndian, &current)
+			if last > 0 && last > current {
+				log.Printf("udp listener: received \"%v\" - OUT OF ORDER!", current)
+			} else {
+
+				log.Printf("udp listener: received \"%v\"", current)
 			}
-			log.Printf("udp: %q", b[:rlen])
+			last = current
 		}
 	}()
 
